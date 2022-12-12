@@ -1,0 +1,740 @@
+
+Clase Grupo:
+     public class Grupo
+    {
+        private static string BD_SERVER = Properties.Settings.Default.BD_SERVER;
+        private static string BD_NAME = Properties.Settings.Default.BD_NAME;
+
+        private int ID;
+        private string NOMBRE;
+        private List<Cancion> TOCAN;
+        private List<Musico> COMPONENTES;
+
+        public static List<Grupo> ListaGrupos()
+        {
+            List<Grupo> lista = new List<Grupo>();
+            // Retorna una lista con todos los objetos de la clase almacenados en la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+
+            foreach (object[] tupla in miBD.Select("SELECT ID_GRUPO FROM Grupo;"))
+            {
+                lista.Add(new Grupo((int)tupla[0]));
+            }
+            return lista;
+        }
+
+        public static List<Grupo> ListaGruposTocan(Cancion c)
+        {
+            List<Grupo> lista = new List<Grupo>();
+            // Retorna una lista con todos los objetos de la clase almacenados en la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+
+            foreach (object[] tupla in miBD.Select("SELECT ID_GRUPO FROM Tocan WHERE ID_CANCION = " + c.Id_Cancion + ";"))
+            {
+                lista.Add(new Grupo((int)tupla[0]));
+            }
+            return lista;
+        }
+
+
+        public Grupo(int id)
+        {
+            // Crea el objeto cargando sus valores de la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+            object[] tupla = miBD.Select("SELECT * FROM Grupo WHERE ID_GRUPO=" + id + ";")[0];
+
+            ID = (int)tupla[0];
+            NOMBRE = (string)tupla[1];
+            TOCAN = null; // Lazzy activation
+            COMPONENTES = null; // Lazzy activation 
+        }
+
+        public Grupo(int id, String name)
+        {
+            // Crea el objeto y lo inserta en la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+            miBD.Insert("INSERT INTO Grupo VALUES (" + id + ", '" + name + "');");
+            this.ID = id;
+            this.NOMBRE = name;
+            this.TOCAN = null; // Lazzy activation
+            this.COMPONENTES = null;
+        }
+
+        public int Id
+        {
+            get { return ID; }
+            set
+            {
+                SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+                miBD.Update("UPDATE Grupo SET ID_GRUPO = " + value
+                    + " WHERE ID_GRUPO =" + this.ID + ";");
+                ID = value;
+            }
+        }
+
+        public string Nombre
+        {
+            get { return NOMBRE; }
+            set
+            {
+                // Actualiza el atributo en memoria y en la base de datos
+                SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+                miBD.Update("UPDATE Grupo SET NOMBRE = '" + value
+                    + "' WHERE ID_GRUPO =" + this.ID + ";");
+
+                NOMBRE = value;
+            }
+        }
+
+        public List<Cancion> Tocan
+        {
+            get
+            {
+                if (TOCAN == null) TOCAN = Cancion.ListaCancionesTocadas(this);
+                return TOCAN;
+            }
+        }
+
+        public List<Musico> Componentes
+        {
+            get
+            {
+                // if (COMPONENTES == null) this.COMPONENTES = Musico.ListaMusicos(this);
+                return this.COMPONENTES;
+            }
+        }
+
+        public void addCancion(Cancion c)
+        {
+            // Actualiza el atributo en memoria y en la base de datos             
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+            try
+            {
+                miBD.Insert("INSERT INTO Tocan VALUES(" + this.ID + "," + c.Id_Cancion + ");");
+            }
+            catch
+            {
+                // Ya estaba insertada .. lo ignoro
+            }
+            if (TOCAN == null) TOCAN = Cancion.ListaCancionesTocadas(this);
+            else TOCAN.Add(c);
+
+        }
+
+        public void borrarGrupo()
+        {
+            // Borra el objeto de la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+            miBD.Delete("DELETE FROM Grupo WHERE ID_GRUPO =" + this.ID + ";");
+            ID = -1;
+            NOMBRE = null;
+            TOCAN = null;
+        }
+
+        public override string ToString()
+        {
+            // Devuelve el grupo serializado en CSV
+            string res = this.ID + ";" + this.NOMBRE + ";";
+            /* futuro
+            for (Musico m:this.getCOMPONENTES())
+            {
+                res += (m.getClass().getName() + ";" + m);
+            }
+            */
+
+            return res;
+        }
+
+        public override bool Equals(object obj)
+        {            
+            return obj is Grupo
+                && (((Grupo)obj).Id == this.ID);
+        }
+
+        public override int GetHashCode()
+        {
+            return this.ID.GetHashCode();
+        }
+    }
+
+
+
+
+Clase Cancion:
+    public class Cancion
+    {
+        private static string BD_SERVER = Properties.Settings.Default.BD_SERVER;
+        private static string BD_NAME = Properties.Settings.Default.BD_NAME;
+
+
+        private int ID_CANCION;
+        private string NOMBRE;
+        private int DURACION;
+        private List<Grupo> TOCADA;
+
+        public static List<Cancion> ListaCanciones()
+        {
+            return Cancion.ListaCancionesTocadas(null);
+        }
+
+        public static List<Cancion> ListaCancionesTocadas(Grupo g)
+        {
+            List<Cancion> lista = new List<Cancion>();
+            // Retorna una lista con todos los objetos de la clase almacenados en la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+
+            string where = (g == null ? ";" : "WHERE ID_GRUPO = " + g.Id + ";");
+
+            foreach (object[] tupla in miBD.Select("SELECT ID_CANCION FROM Tocan " + where))
+            {
+                lista.Add(new Cancion((int)tupla[0]));
+            }
+            return lista;
+        }
+
+        public Cancion(int id)
+        {
+            // Crea el objeto cargando sus valores de la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+            object[] tupla = miBD.Select("SELECT * FROM Cancion WHERE ID_CANCION = " + id + ";")[0];
+
+            this.ID_CANCION = (int)tupla[0];
+            this.NOMBRE = (string)tupla[1];
+            this.DURACION = (int)tupla[2];
+            this.TOCADA = null;
+        }
+
+        public Cancion(string nombre, int duracion)
+        {
+            // Crea el objeto y lo inserta en la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+
+            miBD.Insert("INSERT INTO Cancion(NOMBRE,DURACION) VALUES ('" + nombre + "', " + duracion + ");");
+            ID_CANCION = ((int)miBD.SelectScalar("SELECT MAX(ID_CANCION) FROM Cancion;"));
+            this.NOMBRE = nombre;
+            this.DURACION = duracion;
+            this.TOCADA = null;
+        }
+
+        public int Id_Cancion
+        {
+            get { return ID_CANCION; }
+            // El set está prohibido
+        }
+
+        public string Nombre
+        {
+            get { return NOMBRE; }
+            set
+            {
+                // Actualiza el atributo en memoria y en la base de datos
+                SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+                miBD.Update("UPDATE Cancion SET NOMBRE = '" + value
+                        + "' WHERE ID_CANCION =" + this.ID_CANCION + ";");
+
+                NOMBRE = value;
+            }
+        }
+
+        public int Duracion
+        {
+            get { return DURACION; }
+            set
+            {
+                // Actualiza el atributo en memoria y en la base de datos
+                SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+                miBD.Update("UPDATE Cancion SET DURACION = " + value
+                        + " WHERE ID_CANCION =" + this.ID_CANCION + ";");
+
+                DURACION = value;
+            }
+        }
+
+        public List<Grupo> getTocada()
+        {
+            if (TOCADA == null) TOCADA = Grupo.ListaGruposTocan(this);
+            return TOCADA;
+        }
+
+        public void addGrupo(Grupo g)
+        {
+            // Actualiza el atributo en memoria y en la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+            try
+            {
+                miBD.Insert("INSERT INTO Tocan VALUES(" + g.Id + "," + this.ID_CANCION + ");");
+            }
+            catch 
+            {
+                // Ya estaba insertada .. lo ignoro
+            }
+            if (TOCADA == null) TOCADA = Grupo.ListaGruposTocan(this);
+            else TOCADA.Add(g);
+        }
+
+        public void BorrarCancion()
+        {
+            // Borra el objeto de la base de datos
+            SQLSERVERDB miBD = new SQLSERVERDB(BD_SERVER, BD_NAME);
+            miBD.Delete("DELETE FROM Cancion WHERE ID_CANCION =" + this.ID_CANCION + ";");
+
+            ID_CANCION = -1;
+            NOMBRE = null;
+            DURACION = -1;
+            TOCADA = null;
+        }
+
+        public override string ToString()
+        {
+            // Devuelve la canción serializado en CSV
+            return this.ID_CANCION + ";" + this.NOMBRE + ";" + this.DURACION;
+        }
+
+        public override bool Equals(object obj)
+        {            
+            return obj is Cancion
+                && (((Cancion)obj).Id_Cancion == this.ID_CANCION);
+        }
+
+        public override int GetHashCode()
+        {
+            return this.ID_CANCION.GetHashCode();
+        }
+    }
+
+
+Windows Form:
+    public partial class GRUPOS : Form
+    {
+        private Usuario user;
+        private Grupo seleccionado;
+        public GRUPOS(Usuario user)
+        {
+            InitializeComponent();
+            this.user = user;
+            this.seleccionado = null;
+        }
+
+        private void ComprobarPermisos()
+        {
+            if (!user.AccesoPantalla(this.Name)) this.Close();
+            bInsertar.Enabled = user.InsertarPantalla(this.Name);
+            bUpdate.Enabled = user.ModificarPantalla(this.Name);
+            bBorrar.Enabled = user.BorrarPantalla(this.Name);
+        }
+//Al abrir el formulario se cargarán todos los grupos en el dataGridView.
+        private void GRUPOS_Load(object sender, EventArgs e)
+        {
+            ComprobarPermisos();
+            MostrarSeleccionado();
+        }
+
+        private void MostrarSeleccionado()
+        {
+            if (seleccionado == null)
+            {
+                // TODO: esta línea de código carga datos en la tabla 'gI2223DataSet.Grupo' Puede moverla o quitarla según sea necesario.
+                this.grupoTableAdapter.Fill(this.gI2223DataSet.Grupo);
+
+                dataGridView1.ClearSelection();
+                tID.Text = "";
+                tNombre.Text = "";
+                lCanciones.Items.Clear();
+            }
+            else
+            {
+                tID.Text = seleccionado.Id.ToString();
+                tNombre.Text = seleccionado.Nombre;
+                lCanciones.Items.Clear();
+                foreach (Cancion c in seleccionado.Tocan) lCanciones.Items.Add(c);
+            }
+        }
+//Al seleccionar un grupo en el dataGridView (evento SelectionChanged) se cargará el nombre y la id del grupo en los TextBox correspondientes y la lista de canciones del grupo en el ListBox correspondiente.
+        private void dataGridView1_SelectionChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dataGridView1.SelectedRows.Count > 0)
+                {
+                    int id = (int)dataGridView1.SelectedRows[0].Cells[0].Value;
+                    seleccionado = new Grupo(id);
+                    MostrarSeleccionado();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+        }
+//Al pulsar el botón de INSERTAR se insertará el grupo cuya ID y Nombre esté en los TextBox correspondientes y posteriormente se actualizará el dataGridView y se limpiarán los campos.
+        private void bInsertar_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                seleccionado = new Grupo(int.Parse(tID.Text), tNombre.Text);
+                seleccionado = null;
+                MostrarSeleccionado();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+        }
+//Al pulsar el botón de ACTUALIZAR se actualizarán los campos que hayan sido modificados en los TextBox correspondientes y posteriormente se actualizará el dataGridView y se limpiarán los campos.
+        private void bUpdate_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (seleccionado.Id != int.Parse(tID.Text))
+                {
+                    seleccionado.Id = int.Parse(tID.Text);
+                }
+
+                if (!seleccionado.Nombre.Equals(tNombre.Text))
+                {
+                    seleccionado.Nombre = tNombre.Text;
+                }
+
+                seleccionado = null;
+                MostrarSeleccionado();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+        }
+//Al pulsar el botón de BORRAR se borrará el grupo seleccionado y posteriormente se actualizará el dataGridView y se limpiarán los campos.
+
+        private void bBorrar_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                seleccionado.borrarGrupo();
+                seleccionado = null;
+                MostrarSeleccionado();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+        }
+//Al pulsar el botón de LIMPIAR se limpiarán los campos.
+        private void bClean_Click(object sender, EventArgs e)
+        {
+            seleccionado = null;
+            MostrarSeleccionado();
+        }
+//Al pulsar el botón de SALIR se cerrará el formulario.
+        private void bExit_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+
+Linq2SQL:
+    public partial class MUSICOS : Form
+    {
+
+        private Usuario user;
+        private Musico seleccionado;
+        public MUSICOS(Usuario user)
+        {
+            InitializeComponent();
+            this.user = user;
+            this.seleccionado = null;
+        }
+//Al abrir el formulario se cargarán todos los músicos en el dataGridView, todos los rupos el lGrupos y todos los posibles puestos (Vocalista, Guitarrista, etc) en lPuestos
+        private void MUSICOS_Load(object sender, EventArgs e)
+        {
+            if (!user.AccesoPantalla(this.Name)) this.Close();
+
+            GI2223DataContext bd = new GI2223DataContext();
+
+            CargarMusicos();
+            lGrupos.DataSource = bd.Grupo;
+            lPuestos.Items.Add(typeof(Bajista));
+            lPuestos.Items.Add(typeof(Baterista));
+            lPuestos.Items.Add(typeof(Guitarrista));
+            lPuestos.Items.Add(typeof(Vocalista));
+            lGrupos.SelectedItem = lPuestos.SelectedItem = null;
+
+        }
+
+        private void CargarMusicos()
+        {
+            GI2223DataContext bd = new GI2223DataContext();
+
+            dataGridView1.DataSource = from m in bd.Musico
+                                       select new
+                                       {
+                                           NIF = m.NIF,
+                                           NOMBRE = m.NOMBRE,
+                                           GRUPO = m.Grupo.NOMBRE
+                                       };
+            dataGridView1.Columns[2].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            dataGridView1.ClearSelection();
+        }
+//Al pulsar el botón de SALIR se cerrará el formulario.
+        private void bExit_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+//Al seleccionar un Músico en el dataGridView (evento SelectionChanged) se cargará el nif y el nombre en los TextBox correspondientes y se seleccionará el grupo y el puesto.
+        private void dataGridView1_SelectionChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dataGridView1.SelectedRows.Count > 0)
+                {
+                    GI2223DataContext bd = new GI2223DataContext();
+                    string nif = (string)dataGridView1.SelectedRows[0].Cells[0].Value;
+                    seleccionado = bd.Musico.First(x => x.NIF == nif);
+                    MostrarSeleccionado();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+        }
+
+        private void MostrarSeleccionado()
+        {            
+            if (seleccionado == null)
+            {
+                tNIF.Text = "";
+                tNombre.Text = "";                
+                lGrupos.SelectedItem = null;
+                lPuestos.SelectedItem = null;
+            }
+            else
+            {
+                tNIF.Text = seleccionado.NIF;
+                tNombre.Text = seleccionado.NOMBRE;
+                lGrupos.SelectedItem = seleccionado.Grupo;
+                if (seleccionado.Bajista != null) lPuestos.SelectedItem = seleccionado.Bajista.GetType();
+                else if (seleccionado.Baterista != null) lPuestos.SelectedItem = seleccionado.Baterista.GetType();
+                else if (seleccionado.Guitarrista != null) lPuestos.SelectedItem = seleccionado.Guitarrista.GetType();
+                else if (seleccionado.Vocalista != null) lPuestos.SelectedItem = seleccionado.Vocalista.GetType();
+            }
+        }
+//Al pulsar el botón de LIMPIAR se limpiarán los campos
+        private void bClean_Click(object sender, EventArgs e)
+        {
+            seleccionado = null;
+            MostrarSeleccionado();
+            dataGridView1.ClearSelection();
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+    public partial class PRUEBAS : Form
+    {
+        private tPaciente paciente;
+        private tPruebas seleccionado;
+
+        public PRUEBAS()
+        {
+            InitializeComponent();
+            this.paciente = null;
+            this.seleccionado = null;
+        }
+
+        private void ajustaDataGridView(DataGridView dataGridView)
+        {
+            for (int i = 0; i < dataGridView.Columns.Count; ++i)
+            {
+                if (i < dataGridView.Columns.Count - 1)
+                    dataGridView.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells;
+                else
+                    dataGridView.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            }
+            dataGridView.ClearSelection();
+        }
+//Al ejecutar la aplicación se deben cargar todos los pacientes en el primer dataGridView.
+        private void PRUEBAS_Load(object sender, EventArgs e)
+        {
+            BDDataContext miBD = new BDDataContext();
+            dataGridView1.DataSource = miBD.tPaciente;
+            ajustaDataGridView(dataGridView1);
+            var categorias = from c in miBD.tReferenciasGlucosa select c.categoria;
+            foreach (string s in categorias) lCategoria.Items.Add(s);
+            lCategoria.Items.Add("Valor Erroneo");
+            MostrarPruebas();
+        }
+
+//Al seleccionar un paciente en el primer dataGridView, se deben cargar sus pruebas en el segundo dataGridView.
+        private void dataGridView1_SelectionChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dataGridView1.SelectedRows.Count>0)
+                {
+                    BDDataContext miBD = new BDDataContext();
+                    string nif = (string)dataGridView1.SelectedRows[0].Cells[0].Value;
+                    paciente = miBD.tPaciente.First(x => x.NIF.Equals(nif));
+                    MostrarPruebas();
+                }
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+        }
+
+        private void MostrarPruebas()
+        {
+            BDDataContext miBD = new BDDataContext();
+            dataGridView2.DataSource = null;
+            if (paciente != null)
+            {
+                dataGridView2.DataSource = from p in miBD.tPruebas where p.NIF.Equals(paciente.NIF) select p;
+                seleccionado = null;
+                ajustaDataGridView(dataGridView2);
+            }
+            MostrarSeleccionado();
+        }
+//Al seleccionar una prueba en el segundo dataGridView, se deben cargar sus valores en los componentes gráficos. 
+
+        private void dataGridView2_SelectionChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dataGridView2.SelectedRows.Count > 0)
+                {
+                    BDDataContext miBD = new BDDataContext();
+                    int id = (int)dataGridView2.SelectedRows[0].Cells[0].Value;
+                    seleccionado = miBD.tPruebas.First(x => x.ID == id);
+                    MostrarSeleccionado();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+        }
+        private void MostrarSeleccionado()
+        {
+            if (seleccionado == null)
+            {
+                dateTimePicker1.Value = DateTime.Now;
+                lCategoria.SelectedItem = null;
+                tValor.Text = "";
+            }
+            else
+            {
+                dateTimePicker1.Value = seleccionado.fecha_hora;
+                lCategoria.SelectedItem = getCategoria((float)seleccionado.valor_glucosa);
+                tValor.Text = seleccionado.valor_glucosa.ToString();
+            }
+        }
+
+        private string getCategoria(float valor)
+        {
+            string res = "Valor Erroneo";
+            try
+            {
+                BDDataContext miBD = new BDDataContext();
+                var c = from val in miBD.tReferenciasGlucosa
+                        where val.desde <= valor && valor < val.hasta
+                        select val;
+                res = c.First().categoria;
+            }
+            catch
+            {
+                res = "Valor Erroneo";
+            }
+            return res;
+        }
+// Si se pulsa sobre añadir se insertará una nueva prueba para ese paciente con los valores que existan y se actualizará el grid.
+        private void bIns_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                BDDataContext miBD = new BDDataContext();
+                seleccionado = new tPruebas();
+                seleccionado.NIF = paciente.NIF;
+                seleccionado.fecha_hora = dateTimePicker1.Value;
+                seleccionado.valor_glucosa = float.Parse(tValor.Text);
+                miBD.tPruebas.InsertOnSubmit(seleccionado);
+                miBD.SubmitChanges();
+                seleccionado = null;
+                MostrarPruebas();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+
+        }
+// Si se pulsa Modificar se modificará la prueba seleccionada y se actualizará el grid. No está permitido modificar el ID de la prueba ni el Paciente de la Prueba.
+        private void bUpd_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                BDDataContext miBD = new BDDataContext();
+                seleccionado = miBD.tPruebas.First(x => x.ID == seleccionado.ID);
+                if (!seleccionado.fecha_hora.Equals(dateTimePicker1.Value))
+                    seleccionado.fecha_hora = dateTimePicker1.Value;
+                    
+                float val = float.Parse(tValor.Text);
+                if (seleccionado.valor_glucosa != val) seleccionado.valor_glucosa = val;
+                miBD.SubmitChanges();
+                seleccionado = null;
+                MostrarPruebas();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+
+        }
+//Si se pulsa Borrar se borrará la prueba seleccionada y se actualizará el grid.
+        private void bDel_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                BDDataContext miBD = new BDDataContext();
+                seleccionado = miBD.tPruebas.First(x => x.ID == seleccionado.ID);
+                miBD.tPruebas.DeleteOnSubmit(seleccionado);
+                miBD.SubmitChanges();
+                seleccionado = null;
+                MostrarPruebas();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("ERROR: " + ex.Message);
+            }
+
+        }
+//Si se pulsa en Limpiar se deseleccionará el paciente, se limpiará el grid de pruebas y todos los controles.
+
+        private void bClear_Click(object sender, EventArgs e)
+        {
+            dataGridView1.ClearSelection();
+            paciente = null;
+            seleccionado = null;
+            MostrarPruebas();
+        }
+
+        private void bExit_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void lCategoria_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (seleccionado != null)
+            {
+                lCategoria.SelectedItem = getCategoria((float)seleccionado.valor_glucosa);
+            }
+        }
+    }
